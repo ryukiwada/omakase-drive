@@ -4,6 +4,8 @@ raw='wakayama_raw.geojson'; out='wakayama_roads.geojson'
 subprocess.run([sys.executable,'-m','pip','--version'],check=True,stdout=subprocess.DEVNULL)
 subprocess.run(['overturemaps','download','--bbox=135.13,34.18,135.25,34.29','-f','geojson','--type=segment','-o',raw],check=True)
 features=[]
+with open(raw, 'rb') as f:
+    print('RAW SAMPLE:', repr(f.read(300)), flush=True)
 with open(raw,encoding='utf-8') as f:
  for line in f:
   line=line.strip().lstrip("\x1e")
