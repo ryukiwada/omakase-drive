@@ -1,0 +1,24 @@
+name: Generate Wakayama road data
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install overturemaps
+      - run: python build_wakayama.py
+      - name: Commit road data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add wakayama_roads.geojson
+          if ! git diff --cached --quiet; then
+            git commit -m "Update Wakayama road data"
+            git push
+          fi
