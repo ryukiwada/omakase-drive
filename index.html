@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>おまかせドライブ｜試作版</title><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><style>
+:root{font-family:system-ui,-apple-system,'Hiragino Kaku Gothic ProN',Meiryo,sans-serif;color:#1a2731}*{box-sizing:border-box}body{margin:0;background:#f3f6f8}.shell{display:grid;grid-template-columns:350px 1fr;height:100dvh}.side{padding:21px;overflow:auto;background:white;box-shadow:2px 0 15px #13293e15;z-index:500}.brand{font-size:24px;font-weight:800;margin:0 0 5px}.sub{font-size:12px;color:#6d7a84;margin:0 0 20px}.note{font-size:12px;background:#fff3d6;border-radius:9px;padding:12px;line-height:1.6;color:#76571f;margin:15px 0}.field{margin:17px 0}.field label{display:block;font-size:13px;font-weight:750;margin:0 0 8px}.help{font-size:12px;color:#73818c;line-height:1.55;margin:7px 0}.buttonRow{display:flex;gap:8px;flex-wrap:wrap}.btn{cursor:pointer;border:1px solid #ced7de;background:#fff;color:#253c4b;border-radius:10px;padding:10px 12px;font-size:13px;font-weight:650}.btn.active{background:#e0f4ed;border-color:#008963;color:#007553}.btn.primary{display:block;width:100%;background:#087d65;color:white;border:0;font-size:15px;padding:13px}.btn:disabled{opacity:.55;cursor:wait}select,input[type=range]{width:100%}select{padding:11px;border:1px solid #ced7de;border-radius:8px;background:white}input[type=range]{accent-color:#087d65}.stats{background:#f1f7f5;border-radius:12px;padding:13px;margin-top:12px;line-height:1.8;font-size:13px}.routecard{border:1px solid #d7e1e6;padding:10px;border-radius:9px;margin-top:8px;cursor:pointer}.routecard.selected{border:2px solid #087d65;background:#effaf6}.routes{margin-top:15px}.audit{margin-top:12px;border:1px solid #d5e4e1;border-radius:10px;background:#f6fbf9;padding:12px;font-size:12px;line-height:1.65}.audit button{margin-top:9px}.audit b{font-weight:800}.audit .muted{color:#647682}.audit .bad{color:#9d3d24;font-weight:700}.audit .good{color:#137451;font-weight:700}.status{font-size:12px;min-height:18px;color:#47636e;margin-top:12px;line-height:1.5}#map{width:100%;height:100%}.badge{display:inline-block;border-radius:5px;padding:2px 5px;background:#eef1f3;font-size:11px;color:#5a6872}.footer{font-size:11px;color:#87949e;line-height:1.6;margin:25px 0}.sec{border-top:1px solid #edf0f2;padding-top:13px;margin-top:15px}@media(max-width:740px){.shell{display:flex;flex-direction:column;height:100dvh}.side{height:54%;flex:none;overflow-y:auto;padding:14px}#map{height:46%;flex:none}.brand{font-size:21px}.field{margin:12px 0}.footer{margin-top:12px}}
+</style></head><body><div class="shell"><aside class="side"><h1 class="brand">🚗 おまかせドライブ</h1><p class="sub">Web版 v0.8.2 ・道路情報取得先を改善</p><div class="note"><b>試作・出発前のコース確認専用</b><br>ルート全体の道幅保証、車線案内・GPSナビは未実装。安全な走行ルートを保証しません。運転中は操作しないでください。</div><div class="field"><label>地図をタップして地点を設定</label><div class="buttonRow"><button class="btn active" id="setStart">① 出発地点</button><button class="btn" id="setEnd">② 帰着地点</button><button class="btn" id="same">帰着＝出発</button></div><p class="help" id="pointsText">出発・帰着：和歌山駅付近（仮の地点）</p><button class="btn" id="locate">📍 現在地を出発地点にする</button></div><div class="field"><label for="duration">希望時間：<strong id="timeText">120分</strong></label><input type="range" id="duration" min="30" max="240" step="15" value="120"><p class="help">交通状況を考慮しない概算です。希望時間どおりになる保証はありません。</p></div><div class="field"><label for="style">ルートの傾向</label><select id="style"><option value="varied">バリエーション重視</option><option value="north">北方向へ</option><option value="south">南方向へ</option><option value="east">東方向へ</option><option value="west">西方向へ</option></select></div><div class="field"><label>周回ルートの優先度</label><select id="loop"><option value="prefer">行きと帰りは別の道を優先</option><option value="strict">同じ道が多いルートは表示しない</option><option value="allow">同じ道でも時間を優先</option></select><p class="help">地形や道路網の制約で、同じ道を通る場合があります。判定は経路形状からの概算です。</p></div><div class="field"><label for="highway">高速道路の利用</label><select id="highway"><option value="normal">利用してもOK（通常ルート）</option><option value="avoid">なるべく利用しない（一般道優先）</option></select><p class="help" id="highwayHint">「なるべく利用しない」はValhallaで高速道路の優先度を最低にして計算します。高速道路や有料道路を完全に除外する設定ではありません。無料の公開デモを使うため、検索できない場合があります。</p></div><div class="field"><label for="road">道路の走りやすさ（試験機能）</label><select id="road"><option value="normal">通常（従来どおり）</option><option value="prefer">路地・生活道路などをなるべく避ける</option></select><p class="help">「避ける」設定ではValhallaの道路種別ごとの経路コストを調整します。<b>車線数・実際の道幅は判定できません。</b>片側1車線以上を保証する機能ではなく、狭い道が含まれる場合があります。</p></div><button class="btn primary" id="generate">周回ルートを生成する</button><div class="status" id="status" role="status">地点を変更するか、そのまま生成できます。</div><div class="routes" id="routes"></div><div class="audit" id="audit"><b>🛣️ 道路情報のサンプル検査（v0.8.2）</b><div class="muted">ルート生成後に「選択中のコースを検査」を押すと、経路上の最大8地点の登録道路情報を調べます。全道路の幅員を確認するものではありません。</div><button class="btn" id="auditBtn" disabled>選択中のコースを検査</button><div id="auditResult" aria-live="polite"></div></div><div class="footer">地図・道路データ © OpenStreetMap contributors ／ 経路 © OSRM・Valhalla（公開デモサーバー）／ 道路情報取得 © Overpass API。ネット接続が必要です。公開デモは混雑・停止する場合があります。個人的な機能検証用です。</div></aside><main id="map"></main></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>
+'use strict';
+const map=L.map('map').setView([34.232,135.191],11);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
+let start=[34.232,135.191],end=[34.232,135.191],mode='start',layer=null,results=[],selectedIndex=-1,auditBusy=false;let sm=L.marker(start).addTo(map).bindPopup('出発地点'),em=L.marker(end).addTo(map).bindPopup('帰着地点');const $=id=>document.getElementById(id);function coords(c){return `${c[1].toFixed(6)},${c[0].toFixed(6)}`;}function rad(a){return a*Math.PI/180;}function dest(p,km,bearing){const R=6371,ad=km/R,la=rad(p[0]),lo=rad(p[1]),br=rad(bearing);const lat=Math.asin(Math.sin(la)*Math.cos(ad)+Math.cos(la)*Math.sin(ad)*Math.cos(br));const lon=lo+Math.atan2(Math.sin(br)*Math.sin(ad)*Math.cos(la),Math.cos(ad)-Math.sin(la)*Math.sin(lat));return [lat*180/Math.PI,lon*180/Math.PI];}function update(){sm.setLatLng(start);em.setLatLng(end);$('pointsText').textContent=`出発 ${start.map(v=>v.toFixed(4)).join(', ')} ／ 帰着 ${end.map(v=>v.toFixed(4)).join(', ')}`;}function select(m){mode=m;$('setStart').classList.toggle('active',m==='start');$('setEnd').classList.toggle('active',m==='end');}map.on('click',ev=>{if(mode==='start')start=[ev.latlng.lat,ev.latlng.lng];else end=[ev.latlng.lat,ev.latlng.lng];update();});$('setStart').onclick=()=>select('start');$('setEnd').onclick=()=>select('end');$('same').onclick=()=>{
+ end=[...start];update();
+ $('status').textContent='✅ 帰着地点を出発地点と同じ位置に設定しました。';
+ $('same').textContent='✓ 同じ地点に設定済み';
+ $('same').classList.add('active');
+ map.panTo(start);
+ // 両マーカーが重なると見分けられないため、出発地点のポップアップでも通知する
+ sm.bindPopup('出発地点・帰着地点（同じ場所）').openPopup();
+ window.setTimeout(()=>{$('same').textContent='帰着＝出発';$('same').classList.remove('active');},1800);
+};$('duration').oninput=e=>$('timeText').textContent=e.target.value+'分';$('locate').onclick=()=>{if(!navigator.geolocation){$('status').textContent='位置情報に非対応のブラウザです。';return;}navigator.geolocation.getCurrentPosition(p=>{start=[p.coords.latitude,p.coords.longitude];update();map.setView(start,13);$('status').textContent='現在地を出発地点に設定しました。';},e=>$('status').textContent='現在地を取得できませんでした（位置情報の許可・HTTPS環境を確認）。',{timeout:12000,enableHighAccuracy:true});};function distKm(a,b){const la1=rad(a[0]),la2=rad(b[0]),dlat=la2-la1,dlon=rad(b[1]-a[1]);return 12742*Math.asin(Math.sqrt(Math.sin(dlat/2)**2+Math.cos(la1)*Math.cos(la2)*Math.sin(dlon/2)**2));}function clear(){if(layer)map.removeLayer(layer);layer=null;$('routes').innerHTML='';results=[];selectedIndex=-1;$('auditBtn').disabled=true;$('auditResult').textContent='';}
+// 前後逆方向に重なった経路の長さを、座標の簡易照合で推定（完全な道路識別ではない）
+function backtrackRatio(geometry){
+ const c=geometry.coordinates||[],edges=new Map();let total=0,repeated=0;
+ for(let i=1;i<c.length;i++){
+  const a=c[i-1],b=c[i], length=distKm([a[1],a[0]],[b[1],b[0]]);
+  if(length<.003)continue;
+  const k1=a.map(v=>v.toFixed(4)).join(','),k2=b.map(v=>v.toFixed(4)).join(',');
+  const key=k1<k2?k1+'|'+k2:k2+'|'+k1;
+  const prev=edges.get(key)||0;
+  if(prev)repeated+=length;
+  edges.set(key,prev+1);total+=length;
+ }
+ return total?repeated/total:0;
+}
+// Valhallaのencoded polyline6を[経度,緯度]のGeoJSON座標へ変換
+function decodePolyline6(encoded){
+ let index=0,lat=0,lon=0;const out=[];
+ function read(){let result=0,shift=0,b;do{if(index>=encoded.length)throw Error('経路データが不完全です');b=encoded.charCodeAt(index++)-63;result|=(b&31)<<shift;shift+=5;}while(b>=32);return(result&1)?~(result>>1):result>>1;}
+ while(index<encoded.length){lat+=read();lon+=read();out.push([lon/1e6,lat/1e6]);}return out;
+}
+async function routeCandidate(i,minutes,radius,variant=0){
+ const dirs={varied:[20,145,260],north:[0,40,320],south:[180,145,215],east:[90,55,125],west:[270,235,305]}[$('style').value];
+ const dir=dirs[i]+(variant%2===0?0:18);
+ // 複数の経由点を扇状に配置することで往復同じ道路になる経路を減らす
+ const spread=variant===2?90:variant===1?65:75;
+ const a=dest(start,radius*.8,dir-spread),b=dest(start,radius*1.20,dir),c=dest(start,radius*.8,dir+spread);
+ const way=[start,a,b,c,end];
+
+ if($('highway').value==='avoid'||$('road').value==='prefer'){
+  // Valhallaのuse_highways:0は優先度を下げる設定であり、完全な高速道路禁止ではない
+  const locations=way.map((p,i)=>({lat:p[0],lon:p[1],type:(i===0||i===way.length-1)?'break':'through'}));
+  const options={};
+  if($('highway').value==='avoid'){options.use_highways=0;options.use_tolls=0;}
+  if($('road').value==='prefer'){options.use_living_streets=0;options.use_tracks=0;options.alley_factor=5;options.service_factor=3;options.service_penalty=120;}
+  const query={locations,costing:'auto',costing_options:{auto:options},units:'kilometers',language:'ja-JP'};
+  const url='https://valhalla1.openstreetmap.de/route?json='+encodeURIComponent(JSON.stringify(query));
+  const res=await fetch(url,{headers:{'X-Client-Id':'omakase-drive.github.io'}});
+  if(!res.ok)throw Error('道路優先設定の経路サーバーが応答しません ('+res.status+')');
+  const j=await res.json();if(!j.trip?.legs?.length)throw Error('設定に合う経路が見つかりません'+(j.error?': '+j.error:''));
+  const coordinates=[];
+  for(const leg of j.trip.legs){const points=decodePolyline6(leg.shape);for(let k=0;k<points.length;k++)if(!coordinates.length||k>0)coordinates.push(points[k]);}
+  const geometry={type:'LineString',coordinates};
+  return{geometry,mins:Math.round(j.trip.summary.time/60),km:Math.round(j.trip.summary.length*10)/10,backtrack:backtrackRatio(geometry)};
+ }
+ const url='https://router.project-osrm.org/route/v1/driving/'+way.map(coords).join(';')+'?overview=full&geometries=geojson&steps=false';
+ const res=await fetch(url);if(!res.ok)throw Error('経路サーバーが応答しません ('+res.status+')');
+ const j=await res.json();if(j.code!=='Ok'||!j.routes?.length)throw Error('経路が見つかりません');
+ const r=j.routes[0];return{...r,mins:Math.round(r.duration/60),km:Math.round(r.distance/1000*10)/10,backtrack:backtrackRatio(r.geometry)};
+}
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+async function tuneCandidate(i,minutes){
+ let radius=Math.min(28,Math.max(2,minutes/60*10)),tries=[];
+ for(let n=0;n<3;n++){
+  if(i!==0||n!==0)await sleep(1250);
+  const r=await routeCandidate(i,minutes,radius,n);tries.push(r);
+  if(Math.abs(r.mins-minutes)<=Math.max(10,minutes*.1)&&r.backtrack<=.15)break;
+  const factor=Math.max(.55,Math.min(1.55,Math.sqrt(minutes/Math.max(r.mins,1))));
+  radius=Math.max(1.5,Math.min(32,radius*factor));
+ }
+ // 時間差だけでなく、同じ道路の往復を抑える
+ return tries.sort((a,b)=>(Math.abs(a.mins-minutes)+a.backtrack*minutes*1.8)-(Math.abs(b.mins-minutes)+b.backtrack*minutes*1.8))[0];
+}
+function show(idx){const r=results[idx];if(!r)return;selectedIndex=idx;$('auditBtn').disabled=auditBusy;$('auditResult').textContent=r.auditText||'';if(layer)map.removeLayer(layer);layer=L.geoJSON(r.geometry,{style:{color:'#05866a',weight:6,opacity:.9}}).addTo(map);map.fitBounds(layer.getBounds(),{padding:[35,35]});$('routes').innerHTML=results.map((v,i)=>`<div class="routecard ${idx===i?'selected':''}" data-i="${i}"><b>${v.name}</b>　${v.mins}分 / ${v.km}km　${i===idx?'✓':''}<br><small>希望時間との差：${Math.abs(v.mins-Number($('duration').value))}分 ／ 同じ道の再通過（概算）：${Math.round(v.backtrack*100)}%</small></div>`).join('');// 表示は必ず A → B → C の順。選択したコースは地図と連動する。
+document.querySelectorAll('.routecard').forEach(x=>x.onclick=()=>show(Number(x.dataset.i)));}
+
+// 任意検査: 全経路の判定ではなく、等距離サンプリングした地点周辺のOSMタグを確認する。
+// 公開Overpassに負荷をかけないため、操作時だけ1リクエスト・最大8地点。
+function sampleRoute(geometry,n=16){
+ const raw=geometry.coordinates||[];if(raw.length<2)return[];
+ const lengths=[0];for(let i=1;i<raw.length;i++)lengths.push(lengths[i-1]+distKm([raw[i-1][1],raw[i-1][0]],[raw[i][1],raw[i][0]]));
+ const total=lengths[lengths.length-1],out=[];let j=1;
+ for(let i=0;i<n;i++){const target=total*(i+.5)/n;while(j<lengths.length-1&&lengths[j]<target)j++;
+ const d=lengths[j]-lengths[j-1],t=d?Math.min(1,Math.max(0,(target-lengths[j-1])/d)):0;
+ out.push([raw[j-1][1]+(raw[j][1]-raw[j-1][1])*t,raw[j-1][0]+(raw[j][0]-raw[j-1][0])*t]);}
+ return out;
+}
+function segmentDistanceM(p,a,b){
+ const ky=111195,kx=ky*Math.cos(rad(p[0]));const x1=(a.lon-p[1])*kx,y1=(a.lat-p[0])*ky,x2=(b.lon-p[1])*kx,y2=(b.lat-p[0])*ky;
+ const dx=x2-x1,dy=y2-y1,t=Math.max(0,Math.min(1,(-x1*dx-y1*dy)/(dx*dx+dy*dy||1)));
+ return Math.hypot(x1+t*dx,y1+t*dy);
+}
+function tagWidth(tags){const m=String(tags.width||'').match(/^(\d+(?:\.\d+)?)\s*(?:m)?$/);return m?Number(m[1]):null;}
+function classifyRoad(tags){
+ // 車線数だけでは上下線の内訳は分からず、車線・幅員の情報は全体に対する保証にならない
+ const lanes=Number(tags.lanes),width=tagWidth(tags),type=tags.highway||'';
+ if((Number.isFinite(lanes)&&lanes>=2)||width>=5.5)return 'registered';
+ if((Number.isFinite(lanes)&&lanes===1)||(width!==null&&width<4)||['track','path','living_street','service'].includes(type))return 'caution';
+ return 'unknown';
+}
+async function inspectRoads(){
+ const idx=selectedIndex,r=results[idx];if(!r||auditBusy)return;
+ auditBusy=true;$('auditBtn').disabled=true;$('auditResult').textContent='道路情報を8地点で軽量検査しています…（公開サービスのため失敗する場合があります）';
+ try{
+  const points=sampleRoute(r.geometry,8);if(!points.length)throw Error('経路の座標を取得できません');
+  const parts=points.map(p=>`way["highway"](around:25,${p[0].toFixed(6)},${p[1].toFixed(6)});`).join('');
+  const q=`[out:json][timeout:18];(${parts});out tags geom;`;
+  // 新しい公式接続先を優先。失敗時だけ別運営の公開APIへ1回フォールバックする。
+  // 短時間の連続リクエストを避けるため、検査ボタンは実行中無効化する。
+  const servers=[
+    'https://overpass.private.coffee/api/interpreter',
+    'https://overpass-api.de/api/interpreter'
+  ];
+  let data=null,lastError='';
+  for(let i=0;i<servers.length;i++){
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),18000);
+    try{
+      $('auditResult').textContent=`道路情報を照会しています（接続先 ${i+1}/${servers.length}）…`;
+      const response=await fetch(servers[i],{
+        method:'POST',body:new URLSearchParams({data:q}),signal:controller.signal
+      });
+      if(!response.ok)throw Error(`HTTP ${response.status}`);
+      const body=await response.json();
+      if(!Array.isArray(body.elements))throw Error('回答形式が不正です');
+      data=body;break;
+    }catch(err){
+      lastError=err.name==='AbortError'?'応答時間超過':(err.message||String(err));
+    }finally{clearTimeout(timer);}
+  }
+  if(!data)throw Error('2つの道路情報サーバーで取得できませんでした（最終エラー：'+lastError+'）');
+  const ways=(data.elements||[]).filter(w=>w.type==='way'&&w.geometry?.length>1);
+  const stats={registered:0,caution:0,unknown:0,unmatched:0},flags=[];
+  points.forEach((p,i)=>{
+   let best=null,bestD=20;
+   for(const w of ways){let min=Infinity;for(let k=1;k<w.geometry.length;k++){
+    const d=segmentDistanceM(p,w.geometry[k-1],w.geometry[k]);if(d<min)min=d;
+   }if(min<bestD){bestD=min;best=w;}}
+   if(!best){stats.unmatched++;return;}
+   const c=classifyRoad(best.tags||{});stats[c]++;
+   if(c==='caution')flags.push(`地点${i+1}: ${best.tags.name||best.tags.ref||'名称不明'}（${best.tags.lanes?'車線 '+best.tags.lanes+' / ':''}${best.tags.width?'幅員 '+best.tags.width+' / ':''}${best.tags.highway||'道路'}）`);
+  });
+  const summary=`道路情報サンプル ${points.length}地点：2車線以上または幅5.5m以上の登録 ${stats.registered}、狭い可能性のある情報 ${stats.caution}、詳細不明 ${stats.unknown}、照合不能 ${stats.unmatched}。`;
+  const details=flags.length?'\n要注意の候補：'+flags.slice(0,5).join(' / '):'';
+  r.auditText=summary+details+'\n※8地点だけを検査する簡易結果です。未検査区間が多くあります。各地点の近傍道路を推定照合した参考情報。実際にその道路を通る保証も、安全性・片側1車線ずつの保証もありません。';
+  if(selectedIndex===idx)$('auditResult').textContent=r.auditText;
+ }catch(e){if(selectedIndex===idx)$('auditResult').textContent='検査できませんでした：'+(e.name==='AbortError'?'応答がタイムアウトしました':e.message)+'。ルート生成自体は引き続き使えます。別の時間帯に再試行できます。';}
+ finally{auditBusy=false;$('auditBtn').disabled=selectedIndex<0;}
+}
+$('auditBtn').onclick=inspectRoads;
+$('generate').onclick=async()=>{const btn=$('generate'),minutes=Number($('duration').value);btn.disabled=true;clear();$('status').textContent='希望時間に近い道路ルートを探しています…（最大3コース、再探索あり）'+($('highway').value==='avoid'?' 高速道路をなるべく避けて検索します。':'');const errs=[],candidates=[];for(let i=0;i<3;i++){try{const r=await tuneCandidate(i,minutes);candidates.push(r);$('status').textContent=`${i+1}/3方向を探索しました。時間を調整しながら検索中…`;}catch(e){errs.push(e.message);}}btn.disabled=false;const tolerance=Math.max(15,Math.round(minutes*.2));const loopMode=$('loop').value;const overlapLimit=loopMode==='strict'?.12:loopMode==='prefer'?.28:1;results=candidates.filter(v=>Math.abs(v.mins-minutes)<=tolerance&&v.backtrack<=overlapLimit);results.sort((a,b)=>(Math.abs(a.mins-minutes)+a.backtrack*minutes)-(Math.abs(b.mins-minutes)+b.backtrack*minutes));// 結果配列の表示順を固定し、優先順位に応じて A, B, C と採番する
+results.sort((a,b)=>(Math.abs(a.mins-minutes)+a.backtrack*minutes)-(Math.abs(b.mins-minutes)+b.backtrack*minutes));
+results.forEach((r,i)=>{r.name='コース '+String.fromCharCode(65+i);});if(!results.length){$('status').textContent=`希望${minutes}分に対し±${tolerance}分以内のコースが見つかりませんでした。出発地点・ルートの傾向・時間・周回優先度を変えてお試しください。`+(errs[0]?' 経路検索エラー: '+errs[0]:'');return;}show(0);$('status').textContent=`希望${minutes}分に対し±${tolerance}分以内の${results.length}コースを表示しました。時間と同一道路の再通過（簡易推定）を考慮して表示しています。条件に合わない候補は非表示です。実走行時間・道路幅・通行可能性は保証しません。高速道路や路地等の回避は優先度設定であり、完全除外ではありません。車線数・道幅を調べるには選択中のコースで「道路情報のサンプル検査」を実行してください。`;};update();
+</script></body></html>
