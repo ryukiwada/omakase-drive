@@ -3,16 +3,15 @@ import json,subprocess,sys,os
 raw='wakayama_raw.geojson'; out='wakayama_roads.geojson'
 subprocess.run([sys.executable,'-m','pip','--version'],check=True,stdout=subprocess.DEVNULL)
 subprocess.run(['overturemaps','download','--bbox=135.13,34.18,135.25,34.29','-f','geojson','--type=segment','-o',raw],check=True)
-features=[]
-with open(raw, 'rb') as f:
-    print('RAW SAMPLE:', repr(f.read(300)), flush=True)
-with open(raw,encoding='utf-8') as f:
- for line in f:
-  line=line.strip().lstrip("\x1e")
-  if not line:continue
-  item=json.loads(line)
-  if item.get('type')=='FeatureCollection': features.extend(item.get('features',[]))
-  elif item.get('type')=='Feature':features.append(item)
+with open(raw, encoding='utf-8') as f:
+    data = json.load(f)
+
+if data.get('type') == 'FeatureCollection':
+    features = data.get('features', [])
+elif data.get('type') == 'Feature':
+    features = [data]
+else:
+    raise ValueError('Unsupported GeoJSON format')
 filtered=[]
 for item in features:
  g=item.get('geometry') or {}
